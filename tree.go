@@ -364,7 +364,10 @@ func (n *node) insertChild(path string, fullPath string, handlers HandlersChain)
 		}
 
 		if len(n.path) > 0 && n.path[len(n.path)-1] == '/' {
-			pathSeg := strings.SplitN(n.children[0].path, "/", 2)[0]
+			pathSeg := ""
+			if len(n.children) != 0 {
+				pathSeg = strings.SplitN(n.children[0].path, "/", 2)[0]
+			}
 			panic("catch-all wildcard '" + path +
 				"' in new path '" + fullPath +
 				"' conflicts with existing path segment '" + pathSeg +
@@ -491,7 +494,7 @@ walk: // Outer loop for walking the tree
 					// We can recommend to redirect to the same URL without a
 					// trailing slash if a leaf exists for that path.
 					value.tsr = path == "/" && n.handlers != nil
-					return
+					return value
 				}
 
 				// Handle wildcard child, which is always at the end of the array
@@ -510,7 +513,14 @@ walk: // Outer loop for walking the tree
 					}
 
 					// Save param value
-					if params != nil && cap(*params) > 0 {
+					if params != nil {
+						// Preallocate capacity if necessary
+						if cap(*params) < int(globalParamsCount) {
+							newParams := make(Params, len(*params), globalParamsCount)
+							copy(newParams, *params)
+							*params = newParams
+						}
+
 						if value.params == nil {
 							value.params = params
 						}
@@ -539,12 +549,12 @@ walk: // Outer loop for walking the tree
 
 						// ... but we can't
 						value.tsr = len(path) == end+1
-						return
+						return value
 					}
 
 					if value.handlers = n.handlers; value.handlers != nil {
 						value.fullPath = n.fullPath
-						return
+						return value
 					}
 					if len(n.children) == 1 {
 						// No handle found. Check if a handle for this path + a
@@ -552,11 +562,18 @@ walk: // Outer loop for walking the tree
 						n = n.children[0]
 						value.tsr = (n.path == "/" && n.handlers != nil) || (n.path == "" && n.indices == "/")
 					}
-					return
+					return value
 
 				case catchAll:
 					// Save param value
 					if params != nil {
+						// Preallocate capacity if necessary
+						if cap(*params) < int(globalParamsCount) {
+							newParams := make(Params, len(*params), globalParamsCount)
+							copy(newParams, *params)
+							*params = newParams
+						}
+
 						if value.params == nil {
 							value.params = params
 						}
@@ -577,7 +594,7 @@ walk: // Outer loop for walking the tree
 
 					value.handlers = n.handlers
 					value.fullPath = n.fullPath
-					return
+					return value
 
 				default:
 					panic("invalid node type")
@@ -608,7 +625,7 @@ walk: // Outer loop for walking the tree
 			// Check if this node has a handle registered.
 			if value.handlers = n.handlers; value.handlers != nil {
 				value.fullPath = n.fullPath
-				return
+				return value
 			}
 
 			// If there is no handle for this route, but this route has a
@@ -616,12 +633,12 @@ walk: // Outer loop for walking the tree
 			// additional trailing slash
 			if path == "/" && n.wildChild && n.nType != root {
 				value.tsr = true
-				return
+				return value
 			}
 
 			if path == "/" && n.nType == static {
 				value.tsr = true
-				return
+				return value
 			}
 
 			// No handle found. Check if a handle for this path + a
@@ -631,11 +648,11 @@ walk: // Outer loop for walking the tree
 					n = n.children[i]
 					value.tsr = (len(n.path) == 1 && n.handlers != nil) ||
 						(n.nType == catchAll && n.children[0].handlers != nil)
-					return
+					return value
 				}
 			}
 
-			return
+			return value
 		}
 
 		// Nothing found. We can recommend to redirect to the same URL with an
@@ -661,7 +678,7 @@ walk: // Outer loop for walking the tree
 			}
 		}
 
-		return
+		return value
 	}
 }
 

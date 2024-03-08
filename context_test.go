@@ -324,6 +324,7 @@ func TestContextCopy(t *testing.T) {
 	c.handlers = HandlersChain{func(c *Context) {}}
 	c.Params = Params{Param{Key: "foo", Value: "bar"}}
 	c.Set("foo", "bar")
+	c.fullPath = "/hola"
 
 	cp := c.Copy()
 	assert.Nil(t, cp.handlers)
@@ -336,6 +337,7 @@ func TestContextCopy(t *testing.T) {
 	assert.Equal(t, cp.Params, c.Params)
 	cp.Set("foo", "notBar")
 	assert.False(t, cp.Keys["foo"] == c.Keys["foo"])
+	assert.Equal(t, cp.fullPath, c.fullPath)
 }
 
 func TestContextHandlerName(t *testing.T) {
@@ -1060,7 +1062,7 @@ func TestContextRenderUTF8Attachment(t *testing.T) {
 }
 
 // TestContextRenderYAML tests that the response is serialized as YAML
-// and Content-Type is set to application/x-yaml
+// and Content-Type is set to application/yaml
 func TestContextRenderYAML(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := CreateTestContext(w)
@@ -1069,7 +1071,7 @@ func TestContextRenderYAML(t *testing.T) {
 
 	assert.Equal(t, http.StatusCreated, w.Code)
 	assert.Equal(t, "foo: bar\n", w.Body.String())
-	assert.Equal(t, "application/x-yaml; charset=utf-8", w.Header().Get("Content-Type"))
+	assert.Equal(t, "application/yaml; charset=utf-8", w.Header().Get("Content-Type"))
 }
 
 // TestContextRenderTOML tests that the response is serialized as TOML
@@ -1217,7 +1219,7 @@ func TestContextNegotiationWithYAML(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	assert.Equal(t, "foo: bar\n", w.Body.String())
-	assert.Equal(t, "application/x-yaml; charset=utf-8", w.Header().Get("Content-Type"))
+	assert.Equal(t, "application/yaml; charset=utf-8", w.Header().Get("Content-Type"))
 }
 
 func TestContextNegotiationWithTOML(t *testing.T) {
@@ -1569,6 +1571,12 @@ func TestContextClientIP(t *testing.T) {
 	c.Request.Header.Del("CF-Connecting-IP")
 	assert.Equal(t, "40.40.40.40", c.ClientIP())
 
+	c.engine.TrustedPlatform = PlatformFlyIO
+	assert.Equal(t, "70.70.70.70", c.ClientIP())
+
+	c.Request.Header.Del("Fly-Client-IP")
+	assert.Equal(t, "40.40.40.40", c.ClientIP())
+
 	c.engine.TrustedPlatform = ""
 
 	// no port
@@ -1581,6 +1589,7 @@ func resetContextForClientIPTests(c *Context) {
 	c.Request.Header.Set("X-Forwarded-For", "  20.20.20.20, 30.30.30.30")
 	c.Request.Header.Set("X-Appengine-Remote-Addr", "50.50.50.50")
 	c.Request.Header.Set("CF-Connecting-IP", "60.60.60.60")
+	c.Request.Header.Set("Fly-Client-IP", "70.70.70.70")
 	c.Request.RemoteAddr = "  40.40.40.40:42123 "
 	c.engine.TrustedPlatform = ""
 	c.engine.trustedCIDRs = defaultTrustedCIDRs
