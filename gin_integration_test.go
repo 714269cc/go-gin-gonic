@@ -1,4 +1,4 @@
-// Copyright 2017 Manu Martinez-Almeida.  All rights reserved.
+// Copyright 2017 Manu Martinez-Almeida. All rights reserved.
 // Use of this source code is governed by a MIT style
 // license that can be found in the LICENSE file.
 
@@ -9,7 +9,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"html/template"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -43,7 +43,7 @@ func testRequest(t *testing.T, params ...string) {
 	assert.NoError(t, err)
 	defer resp.Body.Close()
 
-	body, ioerr := ioutil.ReadAll(resp.Body)
+	body, ioerr := io.ReadAll(resp.Body)
 	assert.NoError(t, ioerr)
 
 	var responseStatus = "200 OK"

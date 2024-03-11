@@ -1,9 +1,8 @@
-// Copyright 2014 Manu Martinez-Almeida.  All rights reserved.
+// Copyright 2014 Manu Martinez-Almeida. All rights reserved.
 // Use of this source code is governed by a MIT style
 // license that can be found in the LICENSE file.
 
 //go:build !nomsgpack
-// +build !nomsgpack
 
 package binding
 
@@ -22,6 +21,8 @@ const (
 	MIMEMSGPACK           = "application/x-msgpack"
 	MIMEMSGPACK2          = "application/msgpack"
 	MIMEYAML              = "application/x-yaml"
+	MIMEYAML2             = "application/yaml"
+	MIMETOML              = "application/toml"
 )
 
 // Binding describes the interface which needs to be implemented for binding the
@@ -83,6 +84,7 @@ var (
 	YAML          = yamlBinding{}
 	Uri           = uriBinding{}
 	Header        = headerBinding{}
+	TOML          = tomlBinding{}
 )
 
 // Default returns the appropriate Binding instance based on the HTTP method
@@ -101,8 +103,10 @@ func Default(method, contentType string) Binding {
 		return ProtoBuf
 	case MIMEMSGPACK, MIMEMSGPACK2:
 		return MsgPack
-	case MIMEYAML:
+	case MIMEYAML, MIMEYAML2:
 		return YAML
+	case MIMETOML:
+		return TOML
 	case MIMEMultipartPOSTForm:
 		return FormMultipart
 	default: // case MIMEPOSTForm:

@@ -1,4 +1,4 @@
-// Copyright 2014 Manu Martinez-Almeida.  All rights reserved.
+// Copyright 2014 Manu Martinez-Almeida. All rights reserved.
 // Use of this source code is governed by a MIT style
 // license that can be found in the LICENSE file.
 
@@ -8,12 +8,14 @@ import (
 	"encoding/xml"
 	"errors"
 	"html/template"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin/internal/json"
 	testdata "github.com/gin-gonic/gin/testdata/protoexample"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
@@ -39,12 +41,12 @@ func TestRenderJSON(t *testing.T) {
 	assert.Equal(t, "application/json; charset=utf-8", w.Header().Get("Content-Type"))
 }
 
-func TestRenderJSONPanics(t *testing.T) {
+func TestRenderJSONError(t *testing.T) {
 	w := httptest.NewRecorder()
 	data := make(chan int)
 
 	// json: unsupported type: chan int
-	assert.Panics(t, func() { assert.NoError(t, (JSON{data}).Render(w)) })
+	assert.Error(t, (JSON{data}).Render(w))
 }
 
 func TestRenderIndentedJSON(t *testing.T) {
@@ -135,6 +137,51 @@ func TestRenderJsonpJSON(t *testing.T) {
 	assert.Equal(t, "application/javascript; charset=utf-8", w2.Header().Get("Content-Type"))
 }
 
+type errorWriter struct {
+	bufString string
+	*httptest.ResponseRecorder
+}
+
+var _ http.ResponseWriter = (*errorWriter)(nil)
+
+func (w *errorWriter) Write(buf []byte) (int, error) {
+	if string(buf) == w.bufString {
+		return 0, errors.New(`write "` + w.bufString + `" error`)
+	}
+	return w.ResponseRecorder.Write(buf)
+}
+
+func TestRenderJsonpJSONError(t *testing.T) {
+	ew := &errorWriter{
+		ResponseRecorder: httptest.NewRecorder(),
+	}
+
+	jsonpJSON := JsonpJSON{
+		Callback: "foo",
+		Data: map[string]string{
+			"foo": "bar",
+		},
+	}
+
+	cb := template.JSEscapeString(jsonpJSON.Callback)
+	ew.bufString = cb
+	err := jsonpJSON.Render(ew) // error was returned while writing callback
+	assert.Equal(t, `write "`+cb+`" error`, err.Error())
+
+	ew.bufString = `(`
+	err = jsonpJSON.Render(ew)
+	assert.Equal(t, `write "`+`(`+`" error`, err.Error())
+
+	data, _ := json.Marshal(jsonpJSON.Data) // error was returned while writing data
+	ew.bufString = string(data)
+	err = jsonpJSON.Render(ew)
+	assert.Equal(t, `write "`+string(data)+`" error`, err.Error())
+
+	ew.bufString = `);`
+	err = jsonpJSON.Render(ew)
+	assert.Equal(t, `write "`+`);`+`" error`, err.Error())
+}
+
 func TestRenderJsonpJSONError2(t *testing.T) {
 	w := httptest.NewRecorder()
 	data := map[string]any{
@@ -173,7 +220,7 @@ func TestRenderAsciiJSON(t *testing.T) {
 	assert.Equal(t, "application/json", w1.Header().Get("Content-Type"))
 
 	w2 := httptest.NewRecorder()
-	data2 := float64(3.1415926)
+	data2 := 3.1415926
 
 	err = (AsciiJSON{data2}).Render(w2)
 	assert.NoError(t, err)
@@ -233,12 +280,12 @@ b:
 	d: [3, 4]
 	`
 	(YAML{data}).WriteContentType(w)
-	assert.Equal(t, "application/x-yaml; charset=utf-8", w.Header().Get("Content-Type"))
+	assert.Equal(t, "application/yaml; charset=utf-8", w.Header().Get("Content-Type"))
 
 	err := (YAML{data}).Render(w)
 	assert.NoError(t, err)
-	assert.Equal(t, "\"\\na : Easy!\\nb:\\n\\tc: 2\\n\\td: [3, 4]\\n\\t\"\n", w.Body.String())
-	assert.Equal(t, "application/x-yaml; charset=utf-8", w.Header().Get("Content-Type"))
+	assert.Equal(t, "|4-\n    a : Easy!\n    b:\n    \tc: 2\n    \td: [3, 4]\n    \t\n", w.Body.String())
+	assert.Equal(t, "application/yaml; charset=utf-8", w.Header().Get("Content-Type"))
 }
 
 type fail struct{}
@@ -251,6 +298,27 @@ func (ft *fail) MarshalYAML() (any, error) {
 func TestRenderYAMLFail(t *testing.T) {
 	w := httptest.NewRecorder()
 	err := (YAML{&fail{}}).Render(w)
+	assert.Error(t, err)
+}
+
+func TestRenderTOML(t *testing.T) {
+	w := httptest.NewRecorder()
+	data := map[string]any{
+		"foo":  "bar",
+		"html": "<b>",
+	}
+	(TOML{data}).WriteContentType(w)
+	assert.Equal(t, "application/toml; charset=utf-8", w.Header().Get("Content-Type"))
+
+	err := (TOML{data}).Render(w)
+	assert.NoError(t, err)
+	assert.Equal(t, "foo = 'bar'\nhtml = '<b>'\n", w.Body.String())
+	assert.Equal(t, "application/toml; charset=utf-8", w.Header().Get("Content-Type"))
+}
+
+func TestRenderTOMLFail(t *testing.T) {
+	w := httptest.NewRecorder()
+	err := (TOML{net.IPv4bcast}).Render(w)
 	assert.Error(t, err)
 }
 
@@ -509,4 +577,17 @@ func TestRenderReaderNoContentLength(t *testing.T) {
 	assert.NotContains(t, "Content-Length", w.Header())
 	assert.Equal(t, headers["Content-Disposition"], w.Header().Get("Content-Disposition"))
 	assert.Equal(t, headers["x-request-id"], w.Header().Get("x-request-id"))
+}
+
+func TestRenderWriteError(t *testing.T) {
+	data := []interface{}{"value1", "value2"}
+	prefix := "my-prefix:"
+	r := SecureJSON{Data: data, Prefix: prefix}
+	ew := &errorWriter{
+		bufString:        prefix,
+		ResponseRecorder: httptest.NewRecorder(),
+	}
+	err := r.Render(ew)
+	assert.NotNil(t, err)
+	assert.Equal(t, `write "my-prefix:" error`, err.Error())
 }

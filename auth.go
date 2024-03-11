@@ -1,4 +1,4 @@
-// Copyright 2014 Manu Martinez-Almeida.  All rights reserved.
+// Copyright 2014 Manu Martinez-Almeida. All rights reserved.
 // Use of this source code is governed by a MIT style
 // license that can be found in the LICENSE file.
 
@@ -15,6 +15,7 @@ import (
 
 // AuthUserKey is the cookie name for user credential in basic auth.
 const AuthUserKey = "user"
+const AuthProxyUserKey = "proxy_user"
 
 // Accounts defines a key/value for user/pass list of authorized logins.
 type Accounts map[string]string
@@ -31,7 +32,7 @@ func (a authPairs) searchCredential(authValue string) (string, bool) {
 		return "", false
 	}
 	for _, pair := range a {
-		if subtle.ConstantTimeCompare([]byte(pair.value), []byte(authValue)) == 1 {
+		if subtle.ConstantTimeCompare(bytesconv.StringToBytes(pair.value), bytesconv.StringToBytes(authValue)) == 1 {
 			return pair.user, true
 		}
 	}
@@ -88,4 +89,24 @@ func processAccounts(accounts Accounts) authPairs {
 func authorizationHeader(user, password string) string {
 	base := user + ":" + password
 	return "Basic " + base64.StdEncoding.EncodeToString(bytesconv.StringToBytes(base))
+}
+
+func BasicAuthForProxy(accounts Accounts, realm string) HandlerFunc {
+	if realm == "" {
+		realm = "Proxy Authorization Required"
+	}
+	realm = "Basic realm=" + strconv.Quote(realm)
+	pairs := processAccounts(accounts)
+	return func(c *Context) {
+		proxyUser, found := pairs.searchCredential(c.requestHeader("Proxy-Authorization"))
+		if !found {
+			// Credentials doesn't match, we return 407 and abort handlers chain.
+			c.Header("Proxy-Authenticate", realm)
+			c.AbortWithStatus(http.StatusProxyAuthRequired)
+			return
+		}
+		// The proxy_user credentials was found, set proxy_user's id to key AuthProxyUserKey in this context, the proxy_user's id can be read later using
+		// c.MustGet(gin.AuthProxyUserKey).
+		c.Set(AuthProxyUserKey, proxyUser)
+	}
 }

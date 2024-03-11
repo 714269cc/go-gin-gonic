@@ -1,4 +1,4 @@
-// Copyright 2014 Manu Martinez-Almeida.  All rights reserved.
+// Copyright 2014 Manu Martinez-Almeida. All rights reserved.
 // Use of this source code is governed by a MIT style
 // license that can be found in the LICENSE file.
 
@@ -53,11 +53,8 @@ var (
 )
 
 // Render (JSON) writes data with custom ContentType.
-func (r JSON) Render(w http.ResponseWriter) (err error) {
-	if err = WriteJSON(w, r.Data); err != nil {
-		panic(err)
-	}
-	return
+func (r JSON) Render(w http.ResponseWriter) error {
+	return WriteJSON(w, r.Data)
 }
 
 // WriteContentType (JSON) writes JSON ContentType.

@@ -1,4 +1,4 @@
-// Copyright 2014 Manu Martinez-Almeida.  All rights reserved.
+// Copyright 2014 Manu Martinez-Almeida. All rights reserved.
 // Use of this source code is governed by a MIT style
 // license that can be found in the LICENSE file.
 
@@ -50,7 +50,7 @@ func WrapH(h http.Handler) HandlerFunc {
 	}
 }
 
-// H is a shortcut for map[string]interface{}
+// H is a shortcut for map[string]any
 type H map[string]any
 
 // MarshalXML allows type H to be used with xml.Marshal.

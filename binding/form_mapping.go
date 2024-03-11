@@ -1,4 +1,4 @@
-// Copyright 2014 Manu Martinez-Almeida.  All rights reserved.
+// Copyright 2014 Manu Martinez-Almeida. All rights reserved.
 // Use of this source code is governed by a MIT style
 // license that can be found in the LICENSE file.
 
@@ -7,6 +7,7 @@ package binding
 import (
 	"errors"
 	"fmt"
+	"mime/multipart"
 	"reflect"
 	"strconv"
 	"strings"
@@ -19,7 +20,7 @@ import (
 var (
 	errUnknownType = errors.New("unknown type")
 
-	// ErrConvertMapStringSlice can not covert to map[string][]string
+	// ErrConvertMapStringSlice can not convert to map[string][]string
 	ErrConvertMapStringSlice = errors.New("can not convert to map slices of strings")
 
 	// ErrConvertToMapString can not convert to map[string]string
@@ -235,10 +236,17 @@ func setWithProperType(val string, value reflect.Value, field reflect.StructFiel
 		switch value.Interface().(type) {
 		case time.Time:
 			return setTimeField(val, field, value)
+		case multipart.FileHeader:
+			return nil
 		}
 		return json.Unmarshal(bytesconv.StringToBytes(val), value.Addr().Interface())
 	case reflect.Map:
 		return json.Unmarshal(bytesconv.StringToBytes(val), value.Addr().Interface())
+	case reflect.Ptr:
+		if !value.Elem().IsValid() {
+			value.Set(reflect.New(value.Type().Elem()))
+		}
+		return setWithProperType(val, value.Elem(), field)
 	default:
 		return errUnknownType
 	}

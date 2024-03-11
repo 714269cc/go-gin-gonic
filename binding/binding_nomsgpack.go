@@ -3,7 +3,6 @@
 // license that can be found in the LICENSE file.
 
 //go:build nomsgpack
-// +build nomsgpack
 
 package binding
 
@@ -20,6 +19,8 @@ const (
 	MIMEMultipartPOSTForm = "multipart/form-data"
 	MIMEPROTOBUF          = "application/x-protobuf"
 	MIMEYAML              = "application/x-yaml"
+	MIMEYAML2             = "application/yaml"
+	MIMETOML              = "application/toml"
 )
 
 // Binding describes the interface which needs to be implemented for binding the
@@ -79,6 +80,7 @@ var (
 	YAML          = yamlBinding{}
 	Uri           = uriBinding{}
 	Header        = headerBinding{}
+	TOML          = tomlBinding{}
 )
 
 // Default returns the appropriate Binding instance based on the HTTP method
@@ -95,10 +97,12 @@ func Default(method, contentType string) Binding {
 		return XML
 	case MIMEPROTOBUF:
 		return ProtoBuf
-	case MIMEYAML:
+	case MIMEYAML, MIMEYAML2:
 		return YAML
 	case MIMEMultipartPOSTForm:
 		return FormMultipart
+	case MIMETOML:
+		return TOML
 	default: // case MIMEPOSTForm:
 		return Form
 	}

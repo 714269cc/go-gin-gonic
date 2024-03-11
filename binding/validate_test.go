@@ -1,4 +1,4 @@
-// Copyright 2014 Manu Martinez-Almeida.  All rights reserved.
+// Copyright 2014 Manu Martinez-Almeida. All rights reserved.
 // Use of this source code is governed by a MIT style
 // license that can be found in the LICENSE file.
 
@@ -190,6 +190,30 @@ func TestValidatePrimitives(t *testing.T) {
 	assert.NoError(t, validate(str))
 	assert.NoError(t, validate(&str))
 	assert.Equal(t, "value", str)
+}
+
+type structModifyValidation struct {
+	Integer int
+}
+
+func toZero(sl validator.StructLevel) {
+	var s *structModifyValidation = sl.Top().Interface().(*structModifyValidation)
+	s.Integer = 0
+}
+
+func TestValidateAndModifyStruct(t *testing.T) {
+	// This validates that pointers to structs are passed to the validator
+	// giving us the ability to modify the struct being validated.
+	engine, ok := Validator.Engine().(*validator.Validate)
+	assert.True(t, ok)
+
+	engine.RegisterStructValidation(toZero, structModifyValidation{})
+
+	s := structModifyValidation{Integer: 1}
+	errs := validate(&s)
+
+	assert.Nil(t, errs)
+	assert.Equal(t, s, structModifyValidation{Integer: 0})
 }
 
 // structCustomValidation is a helper struct we use to check that

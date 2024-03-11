@@ -1,4 +1,4 @@
-// Copyright 2014 Manu Martinez-Almeida.  All rights reserved.
+// Copyright 2014 Manu Martinez-Almeida. All rights reserved.
 // Use of this source code is governed by a MIT style
 // license that can be found in the LICENSE file.
 
@@ -9,7 +9,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"io/ioutil"
 	"mime/multipart"
 	"net/http"
 	"os"
@@ -165,6 +164,11 @@ func TestBindingDefault(t *testing.T) {
 
 	assert.Equal(t, YAML, Default("POST", MIMEYAML))
 	assert.Equal(t, YAML, Default("PUT", MIMEYAML))
+	assert.Equal(t, YAML, Default("POST", MIMEYAML2))
+	assert.Equal(t, YAML, Default("PUT", MIMEYAML2))
+
+	assert.Equal(t, TOML, Default("POST", MIMETOML))
+	assert.Equal(t, TOML, Default("PUT", MIMETOML))
 }
 
 func TestBindingJSONNilBody(t *testing.T) {
@@ -454,6 +458,20 @@ func TestBindingXMLFail(t *testing.T) {
 		"<map><foo>bar<foo></map>", "<map><bar>foo</bar></map>")
 }
 
+func TestBindingTOML(t *testing.T) {
+	testBodyBinding(t,
+		TOML, "toml",
+		"/", "/",
+		`foo="bar"`, `bar="foo"`)
+}
+
+func TestBindingTOMLFail(t *testing.T) {
+	testBodyBindingFail(t,
+		TOML, "toml",
+		"/", "/",
+		`foo=\n"bar"`, `bar="foo"`)
+}
+
 func TestBindingYAML(t *testing.T) {
 	testBodyBinding(t,
 		YAML, "yaml",
@@ -639,12 +657,12 @@ func TestBindingFormFilesMultipart(t *testing.T) {
 	// file from os
 	f, _ := os.Open("form.go")
 	defer f.Close()
-	fileActual, _ := ioutil.ReadAll(f)
+	fileActual, _ := io.ReadAll(f)
 
 	// file from multipart
 	mf, _ := obj.File.Open()
 	defer mf.Close()
-	fileExpect, _ := ioutil.ReadAll(mf)
+	fileExpect, _ := io.ReadAll(mf)
 
 	assert.Equal(t, FormMultipart.Name(), "multipart/form-data")
 	assert.Equal(t, obj.Foo, "bar")
@@ -1090,9 +1108,7 @@ func testFormBindingForType(t *testing.T, method, path, badPath, body, badBody s
 		assert.Equal(t,
 			struct {
 				Idx int "form:\"idx\""
-			}(struct {
-				Idx int "form:\"idx\""
-			}{Idx: 123}),
+			}{Idx: 123},
 			obj.StructFoo)
 	case "StructPointer":
 		obj := FooStructForStructPointerType{}
@@ -1101,9 +1117,7 @@ func testFormBindingForType(t *testing.T, method, path, badPath, body, badBody s
 		assert.Equal(t,
 			struct {
 				Name string "form:\"name\""
-			}(struct {
-				Name string "form:\"name\""
-			}{Name: "thinkerou"}),
+			}{Name: "thinkerou"},
 			*obj.StructPointerFoo)
 	case "Map":
 		obj := FooStructForMapType{}
@@ -1334,15 +1348,15 @@ func testProtoBodyBindingFail(t *testing.T, b Binding, name, path, badPath, body
 	obj := protoexample.Test{}
 	req := requestWithBody("POST", path, body)
 
-	req.Body = ioutil.NopCloser(&hook{})
+	req.Body = io.NopCloser(&hook{})
 	req.Header.Add("Content-Type", MIMEPROTOBUF)
 	err := b.Bind(req, &obj)
 	assert.Error(t, err)
 
-	invalid_obj := FooStruct{}
-	req.Body = ioutil.NopCloser(strings.NewReader(`{"msg":"hello"}`))
+	invalidobj := FooStruct{}
+	req.Body = io.NopCloser(strings.NewReader(`{"msg":"hello"}`))
 	req.Header.Add("Content-Type", MIMEPROTOBUF)
-	err = b.Bind(req, &invalid_obj)
+	err = b.Bind(req, &invalidobj)
 	assert.Error(t, err)
 	assert.Equal(t, err.Error(), "obj is not ProtoMessage")
 
